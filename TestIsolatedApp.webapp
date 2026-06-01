@@ -1,0 +1,19 @@
+name = "TestIsolatedApp"
+url = "http://localhost:{PORT}"
+
+[window]
+fullscreen = false
+frameless = false
+transparent_background = false
+
+[window.size]
+width = 600
+height = 400
+use_default = false
+
+[window.position]
+use_default = true
+
+[server]
+script = "run.ps1"
+keep_alive = false

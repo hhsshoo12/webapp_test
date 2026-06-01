@@ -1,0 +1,7 @@
+{
+  "name": "test-isolated-app",
+  "version": "1.0.0",
+  "dependencies": {
+    "canvas-confetti": "^1.6.0"
+  }
+}

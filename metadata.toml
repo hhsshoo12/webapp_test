@@ -1,0 +1,8 @@
+name = "TestIsolatedApp"
+version = "1.0.0"
+repository = "https://github.com/hhsshoo12/test-isolated-app"
+ref = "main"
+
+webapp_path = "TestIsolatedApp.webapp"
+run_path = "run.ps1"
+server_path = "server"
