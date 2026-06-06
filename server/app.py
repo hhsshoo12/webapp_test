@@ -1,39 +1,10 @@
-# server/app.py - Simple HTTP Server that fetches port from the launcher port server
 import http.server
 import socketserver
-import urllib.request
 import os
 import sys
 
-# Get app name
-APP_NAME = "TestIsolatedApp"
-
-# Port server defaults
-PORT_SERVER_URL = "http://127.0.0.1:23001/get-port"
-PORT = 23050 # Default fallback
-
-# Try fetching port from Launcher Port Server
-try:
-    home_dir = os.path.expanduser('~')
-    token_file = os.path.join(home_dir, '.webapp', '.port_token')
-    
-    if os.path.exists(token_file):
-        with open(token_file, 'r') as f:
-            token = f.read().strip()
-        
-        req = urllib.request.Request(f"{PORT_SERVER_URL}?app={APP_NAME}")
-        req.add_header('Authorization', token)
-        
-        print("Requesting port allocation from Launcher port server...")
-        with urllib.request.urlopen(req) as response:
-            res_content = response.read().decode().strip()
-            PORT = int(res_content)
-            print(f"Allocated port: {PORT}")
-    else:
-        print("Port token file not found. Using default port.")
-except Exception as e:
-    print(f"Failed to obtain port from Launcher port server: {e}")
-    print("Using default fallback port.")
+PORT = int(os.environ.get('PORT', 50050))
+print(f"Using port from launcher: {PORT}")
 
 # Simple HTTP request handler
 class Handler(http.server.SimpleHTTPRequestHandler):
