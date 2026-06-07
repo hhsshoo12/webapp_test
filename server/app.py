@@ -1,10 +1,29 @@
 import http.server
+import json
 import socketserver
 import os
 import sys
+import urllib.request
 
 PORT = int(os.environ.get('PORT', 50050))
 print(f"Using port from launcher: {PORT}")
+
+
+def _notify_ready(port: int) -> None:
+    """Signal the webapp-launcher port allocator that this backend is ready."""
+    payload = json.dumps({"port": port}).encode("utf-8")
+    req = urllib.request.Request(
+        "http://127.0.0.1:51000/ready",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            print(f"[ready] Notified port allocator: port {port} is ready (status={resp.status})")
+    except Exception as e:
+        print(f"[ready] Could not notify port allocator (will fall back to socket detection): {e}")
+
 
 # Simple HTTP request handler
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -44,6 +63,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 print(f"Starting server on http://localhost:{PORT}")
 socketserver.TCPServer.allow_reuse_address = True
 with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
+    # Notify the launcher that this backend is now ready to accept connections
+    _notify_ready(PORT)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

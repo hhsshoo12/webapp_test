@@ -83,29 +83,38 @@ python server/app.py
 
 ---
 
-### 4. `server/app.py` (포트 Allocator 연동 및 HTTP 구동)
-런처 내부의 포트 분배 서버(Port Allocator, `23001`번 포트)와 통신하여 충돌하지 않는 고유 포트를 할당받고 웹 서버를 가동하는 예제입니다.
+### 4. `server/app.py` (런처 연동 및 HTTP 구동)
+백엔드 서버의 두 가지 역할을 보여주는 예제입니다.
+
+1. **포트 수신**: 런처가 환경 변수 `PORT`에 고유 포트 번호를 주입합니다. 백엔드는 이를 읽어 해당 포트에 바인딩합니다.
+2. **준비 완료 신호**: 서버가 완전히 바인딩된 즉시 `POST http://127.0.0.1:51000/ready`로 통보합니다. 런처의 스플래시 화면은 이 신호를 받는 즉시 창을 열고 브라우저를 전환합니다. (소켓 폴링 없음)
 
 ```python
 import http.server
+import json
 import socketserver
-import urllib.request
 import os
+import urllib.request
 
-# 1. 런처 인증 토큰 로드 (~/.webapp/.port_token)
-home_dir = os.path.expanduser('~')
-token_file = os.path.join(home_dir, '.webapp', '.port_token')
-with open(token_file, 'r') as f:
-    token = f.read().strip()
+# 1. 런처가 주입한 PORT 환경 변수를 읽어 바인딩할 포트 결정
+PORT = int(os.environ.get('PORT', 50050))
 
-# 2. 포트 서버(23001)에 통신하여 남는 포트 요청
-req = urllib.request.Request("http://127.0.0.1:23001/get-port?app=TestIsolatedApp")
-req.add_header('Authorization', token)
+def _notify_ready(port: int) -> None:
+    """바인딩 완료 즉시 런처 포트 할당 서버에 준비 완료를 통보합니다."""
+    payload = json.dumps({"port": port}).encode("utf-8")
+    req = urllib.request.Request(
+        "http://127.0.0.1:51000/ready",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=2.0)
+    except Exception as e:
+        # 통보 실패 시 런처가 소켓 감지 방식으로 자동 전환(폴백)됩니다.
+        print(f"[ready] 포트 할당 서버 통보 실패 (폴백 동작): {e}")
 
-with urllib.request.urlopen(req) as response:
-    PORT = int(response.read().decode().strip())
-
-# 3. 할당받은 포트로 간단한 Hello World HTTP 웹서버 구동
+# 2. 간단한 Hello World HTTP 웹서버 구동
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -113,8 +122,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write("<h1>Hello World</h1>".encode("utf-8"))
 
-socketserver.TCPServer(("127.0.0.1", PORT), Handler).serve_forever()
+socketserver.TCPServer.allow_reuse_address = True
+with socketserver.TCPServer(("127.0.0.1", PORT), Handler) as httpd:
+    # 3. 바인딩 완료 → 런처에 즉시 통보
+    _notify_ready(PORT)
+    httpd.serve_forever()
 ```
+
 
 ---
 
